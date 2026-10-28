@@ -7,7 +7,7 @@ import { pool, transaction } from './db.mjs';
 import { config } from './config.mjs';
 import { AppError, ensure, cents, digest, hashPassword, verifyPassword, equal, sign } from './domain.mjs';
 import { settleDue, wallet, mutate, createLot, placeBid, cancelLot, listLots, publicLot, auditLot } from './service.mjs';
-import { searchCatalog, getItem, cacheImage } from './catalog.mjs';
+import { searchCatalog, browseCatalog, getItem, cacheImage } from './catalog.mjs';
 const uuid = z.uuid();
 const amountSchema = z.object({ amount: z.number().int().positive().max(100_000_000_000) }).strict();
 const credentials = z.object({ email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128) });
@@ -29,7 +29,7 @@ export function createApp() {
   if (config.production) app.set('trust proxy', 1);
   app.use((req, res, next) => {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" });
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https://images.metmuseum.org; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" });
     if (req.path.startsWith('/api')) res.set('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       try {
@@ -160,6 +160,11 @@ export function createApp() {
     const { rows: [receipt] } = await pool.query('SELECT * FROM receipts WHERE id=$1', [id]);
     ensure(receipt, 'Comprovante não encontrado.', 404);
     res.json({ id, ...receipt.payload, signature: receipt.signature, valid: equal(sign({ id, ...receipt.payload }, config.secret), receipt.signature) });
+  });
+  app.get('/api/exhibition', async (req, res) => {
+    rate(req, 'exhibition', 60);
+    const query = z.object({ q: z.string().trim().max(100).default(''), page: z.coerce.number().int().min(1).max(50000).default(1) }).parse(req.query);
+    res.json(await browseCatalog(query.q, query.page));
   });
   app.get('/api/catalog', auth('auctioneer'), async (req, res) => { rate(req, 'catalog', 20); res.json(await searchCatalog(String(req.query.q || ''))); });
   app.get('/api/catalog/:id/image', async (req, res) => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // These tests use an in-memory DB stub, never the configured real database.
 process.env.AUDIT_SECRET ||= 'catalog-test-secret-of-at-least-32-characters';
 const { pool } = await import('../server/db.mjs');
-const { searchCatalog } = await import('../server/catalog.mjs');
+const { searchCatalog, browseCatalog } = await import('../server/catalog.mjs');
 const artwork = { objectID: 987001, title: 'Obra de busca', artistDisplayName: 'Artista de busca',
   isPublicDomain: true, primaryImageSmall: 'https://images.metmuseum.org/CRDImages/ep/web-large/test.jpg',
   objectURL: 'https://www.metmuseum.org/art/collection/search/987001' };
@@ -65,5 +65,44 @@ test('obras sem domínio público não são importadas nem confundidas com falha
   await mocked(async ({ snapshots }) => {
     const result = await searchCatalog('Artista');
     assert.equal(result.offline, false); assert.equal(result.items.length, 0); assert.equal(snapshots.size, 0);
+  }, url => url.includes('/v1.1/search?') ? json({ total: 1, objectIDs: [987001] }) : json({ ...artwork, isPublicDomain: false }));
+});
+test('exposição pública pagina a lista completa sem copiar o acervo para o banco', async () => {
+  await mocked(async ({ snapshots, images, calls }) => {
+    const first = await browseCatalog('', 1), second = await browseCatalog('', 2);
+    assert.equal(first.items.length, 24); assert.equal(first.hasNext, true); assert.equal(first.total, 25);
+    assert.equal(second.items.length, 1); assert.equal(second.hasNext, false); assert.equal(second.items[0].id, 25);
+    assert.equal(first.items[0].imageUrl, artwork.primaryImageSmall);
+    assert.equal(snapshots.size, 0); assert.equal(images.size, 0);
+    assert.equal(calls.filter(url => url.endsWith('/v1/objects')).length, 1);
+    const before = calls.length;
+    await browseCatalog('', 1);
+    assert.equal(calls.length, before);
+  }, url => {
+    if (url.endsWith('/v1/objects')) return json({ objectIDs: Array.from({ length: 25 }, (_, i) => i + 1) });
+    const id = Number(url.split('/').at(-1));
+    return json({ ...artwork, objectID: id, title: `Obra ${id}` });
+  });
+});
+test('busca pública usa offset e comunica o limite de resultados do museu', async () => {
+  await mocked(async ({ calls }) => {
+    const result = await browseCatalog('consulta paginada', 417);
+    const search = new URL(calls[0]);
+    assert.equal(search.searchParams.get('offset'), '9984'); assert.equal(search.searchParams.get('limit'), '16');
+    assert.equal(result.searchLimited, true); assert.equal(result.reachable, 10000); assert.equal(result.hasNext, false);
+    await assert.rejects(() => browseCatalog('consulta paginada', 418), /Refine a busca/);
+  }, url => url.includes('/v1.1/search?') ? json({ total: 20000, objectIDs: Array.from({ length: 16 }, (_, i) => i + 1) }) : json(artwork));
+});
+test('exposição pública usa os dados salvos quando o museu falha', async () => {
+  await mocked(async ({ snapshots }) => {
+    snapshots.set(1, { id: 1, title: 'Obra salva' });
+    const result = await browseCatalog('falha pública', 1);
+    assert.equal(result.offline, true); assert.equal(result.items.length, 1); assert.equal(result.source, 'cache');
+  }, () => new Response('Unavailable', { status: 503 }));
+});
+test('exposição não publica imagens sem domínio público', async () => {
+  await mocked(async () => {
+    const result = await browseCatalog('obra com direitos', 1);
+    assert.equal(result.items.length, 0); assert.equal(result.offline, false);
   }, url => url.includes('/v1.1/search?') ? json({ total: 1, objectIDs: [987001] }) : json({ ...artwork, isPublicDomain: false }));
 });

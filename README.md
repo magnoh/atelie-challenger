@@ -112,6 +112,7 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 
 - Cadastro e login com perfis de leiloeiro e licitante.
 - Vitrine separada em lotes ao vivo, agendados e encerrados.
+- Acervo público na página inicial, com busca e paginação das obras do Metropolitan, sem necessidade de login.
 - Busca de obras na API pública do The Metropolitan Museum of Art.
 - Criação de lote com imagem, atributos, lance inicial, incremento e horários.
 - Cancelamento pelo dono antes do primeiro lance.
@@ -151,7 +152,11 @@ npm run test:integration
 
 São 6 testes de domínio e 8 de integração, incluindo concorrência no mesmo lote e entre lotes, reserva/liberação, liquidação única, comprovante público, autorização e adulteração direta via SQL. Os testes de integração usam `DATABASE_URL`, criam um schema temporário isolado e o removem no final. O usuário do banco precisa de permissão para criar schemas. Não apagam os dados da demonstração.
 
-Há também 5 testes de catálogo sem banco real, cobrindo o endpoint atual de busca, importação de atributos e imagem, identificação do catálogo salvo, fallback e filtro de domínio público. A busca usa `/public/collection/v1.1/search` com paginação; os detalhes continuam em `/public/collection/v1/objects/{id}`. O endpoint antigo `/v1/search` foi desativado e retorna HTTP 410, conforme a [migração documentada pelo Metropolitan](https://metmuseum.github.io/). No painel do leiloeiro, uma busca por “van Gogh” ou “Hokusai” consulta a API; a tela inicial sem termo exibe os itens já salvos e identifica essa origem. A vitrine pública contém somente lotes publicados por leiloeiros, não todos os objetos do museu.
+Há também 9 testes de catálogo sem banco real, cobrindo busca, importação, fallback, domínio público e navegação do acervo. A busca usa `/public/collection/v1.1/search` com paginação; os detalhes continuam em `/public/collection/v1/objects/{id}`. O endpoint antigo `/v1/search` foi desativado e retorna HTTP 410, conforme a [migração documentada pelo Metropolitan](https://metmuseum.github.io/).
+
+A página inicial oferece “Acervo em exposição”, sem login, consultando `/api/exhibition`. A navegação sem termo usa a lista completa de IDs do endpoint `/v1/objects`, em páginas de até 24 registros; exibe somente os que têm imagem pública. A busca por termo usa a API paginada, que permite acessar até os primeiros 10.000 resultados; a tela avisa quando é necessário refinar a busca. As imagens da exposição são servidas pelo museu. A aplicação mantém a lista de IDs e até 40 páginas recentes em memória, sem baixar todo o acervo para o disco da EC2. Se a API falhar, oferece os itens já salvos. Somente ao importar uma obra para o catálogo do leiloeiro e publicar um lote seus dados/imagem são persistidos no banco, mantendo os leilões independentes da API externa.
+
+Os lotes para lance continuam na seção “Em leilão”. Uma obra em exposição não é automaticamente um lote, não possui preço ou prazo fictício e leva ao registro original do museu para detalhes.
 
 ### Verificação nesta sessão
 

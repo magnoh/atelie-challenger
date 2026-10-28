@@ -83,15 +83,43 @@ function Showcase() {
   const [tab, setTab] = useState('live');
   const displayed = lots.filter(l => l.phase === tab);
   const featured = lots.find(l => l.phase === 'live') || lots[0];
-  return <div className="container"><section className="hero"><div className="hero-copy"><p className="eyebrow">UMA NOVA FORMA DE COLECIONAR</p><h1>O próximo capítulo<br/>da arte começa <em>com você.</em></h1><p>Descubra obras, acompanhe cada lance e encontre<br className="desktop"/> uma história para fazer parte da sua coleção.</p><a href="#lots" onClick={e => { e.preventDefault(); document.getElementById('lots').scrollIntoView({ behavior: 'smooth' }); }} className="button">Explorar leilões <span>↓</span></a><div className="hero-note"><span className="seal-icon">✓</span> Cada lance tem um histórico público e verificável.</div></div>
+  return <div className="container"><section className="hero"><div className="hero-copy"><p className="eyebrow">UMA NOVA FORMA DE COLECIONAR</p><h1>O próximo capítulo<br/>da arte começa <em>com você.</em></h1><p>Descubra obras, acompanhe cada lance e encontre<br className="desktop"/> uma história para fazer parte da sua coleção.</p><a href="#exhibition" onClick={e => { e.preventDefault(); document.getElementById('exhibition').scrollIntoView({ behavior: 'smooth' }); }} className="button">Explorar o acervo <span>↓</span></a><div className="hero-note"><span className="seal-icon">✓</span> Cada lance tem um histórico público e verificável.</div></div>
       {featured && <a className="hero-art" href={`#/lot/${featured.id}`}><Image item={featured.snapshot}/><span className="hero-art-caption"><span>EM DESTAQUE<br/><strong>{featured.snapshot.artist?.split('(')[0]}</strong></span><span>Conhecer a obra ↗</span></span></a>}
     </section>
     <div className="trust-strip"><span>◉ <b>Descubra</b> obras do acervo público</span><span>↗ <b>Participe</b> com lances ao vivo</span><span>✓ <b>Confira</b> o histórico de cada lance</span></div>
+    <Exhibition />
     <section id="lots" className="catalog-section"><div className="section-heading"><div><p className="eyebrow">ESCOLHA SUA PRÓXIMA DESCOBERTA</p><h2>Em leilão</h2></div><span className="connection"><i className={connected ? 'online' : ''}/>{connected ? 'Atualizações ao vivo' : 'Atualizando a cada 15s'}</span></div>
       <div className="tabs" role="tablist" aria-label="Situação dos lotes">{['live', 'scheduled', 'closed'].map(status => <button key={status} role="tab" aria-selected={tab === status} className={tab === status ? 'selected' : ''} onClick={() => setTab(status)}>{status === 'live' ? 'Ao vivo' : status === 'scheduled' ? 'Agendados' : 'Encerrados'}<span>{lots.filter(l => l.phase === status).length}</span></button>)}</div>
       {displayed.length ? <div className="lot-grid">{displayed.map(lot => <LotCard key={lot.id} lot={lot}/>)}</div> : <Empty title="Nenhum lote por aqui" text="Os próximos leilões aparecerão nesta seção."/>}
     </section><div className="source-note">Obras e informações do <a href="https://metmuseum.github.io/" target="_blank" rel="noreferrer">The Metropolitan Museum of Art ↗</a>. Esta é uma plataforma demonstrativa, sem venda de obras reais.</div>
   </div>;
+}
+function Exhibition() {
+  const [query, setQuery] = useState(''), [term, setTerm] = useState(''), [page, setPage] = useState(1);
+  const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    api(`/exhibition?${new URLSearchParams({ q: term, page: String(page) })}`, { signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setData(result); })
+      .catch(e => { if (!controller.signal.aborted) setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [term, page, retry]);
+  const changePage = next => { setPage(next); document.getElementById('exhibition').scrollIntoView({ behavior: 'smooth' }); };
+  return <section id="exhibition" className="catalog-section exhibition-section" aria-busy={loading}>
+    <div className="section-heading"><div><p className="eyebrow">THE METROPOLITAN MUSEUM OF ART</p><h2>Acervo em exposição</h2></div><a className="text-link" href="#lots" onClick={e => { e.preventDefault(); document.getElementById('lots').scrollIntoView({ behavior: 'smooth' }); }}>Ver lotes em leilão ↓</a></div>
+    <p className="muted exhibition-intro">Explore o acervo do museu por páginas ou busque uma obra ou artista. Aqui exibimos as obras com imagens em domínio público; os lotes para dar lances estão na seção de leilões.</p>
+    <form className="search-form" onSubmit={e => { e.preventDefault(); setPage(1); setTerm(query.trim()); setRetry(v => v + 1); }}><label className="sr-only" htmlFor="exhibition-query">Buscar obras ou artistas no museu</label><input id="exhibition-query" placeholder="Busque por obra ou artista, ex.: van Gogh" value={query} maxLength={100} onChange={e => setQuery(e.target.value)}/><button className="button" disabled={loading}>Buscar no acervo</button>{term && <button type="button" className="button secondary" disabled={loading} onClick={() => { setQuery(''); setTerm(''); setPage(1); }}>Todo o acervo</button>}</form>
+    {error ? <div className="alert error" role="alert">{error} <button className="text-link" onClick={() => setRetry(v => v + 1)}>Tentar novamente</button></div> : loading ? <div className="loading" role="status">Consultando as obras do Metropolitan…</div> : <>
+      {data?.offline && <p className="alert" role="status">O museu está indisponível no momento. Exibindo obras do catálogo salvo.</p>}
+      {data?.partial && <p className="alert">Algumas obras não puderam ser carregadas nesta página. Você pode continuar navegando.</p>}
+      {data?.items.length ? <div className="lot-grid">{data.items.map(item => <article className="lot-card" key={item.id}><a className="artwork" href={item.source} target="_blank" rel="noreferrer"><Image item={item}/><span className="badge">Em exposição</span><span className="art-arrow" aria-hidden="true">↗</span></a><div className="card-body"><p className="eyebrow">{item.artist}</p><h3><a href={item.source} target="_blank" rel="noreferrer">{item.title}</a></h3><p className="fine muted">{item.date || 'Data não informada'}{item.medium ? ` · ${item.medium}` : ''}</p><a className="text-link" href={item.source} target="_blank" rel="noreferrer">Ver detalhes no museu ↗</a></div></article>)}</div> : <Empty title="Nenhuma imagem pública nesta página" text="Avance para outra página ou tente buscar por uma obra ou artista."/>}
+      {data?.searchLimited && <p className="fine muted">A busca do museu permite acessar os primeiros 10.000 resultados. Use um termo mais específico para explorar outros resultados.</p>}
+      <nav className="exhibition-pagination" aria-label="Páginas do acervo"><button className="button secondary" disabled={page === 1} onClick={() => changePage(page - 1)}>← Anterior</button><span aria-live="polite">Página {page}{data?.reachable ? ` de ${Math.ceil(data.reachable / data.pageSize).toLocaleString('pt-BR')}` : ''}</span><button className="button secondary" disabled={!data?.hasNext} onClick={() => changePage(page + 1)}>Próxima →</button></nav>
+      <p className="fine muted">Cada página consulta até 24 registros do museu e exibe os que possuem imagem pública. A quantidade de obras visíveis pode variar.</p>
+    </>}
+  </section>;
 }
 function Empty({ title, text }) { return <div className="empty"><span aria-hidden="true">◇</span><h3>{title}</h3><p>{text}</p></div>; }
 function PageTitle({ eyebrow, title, children }) { return <div className="page-title"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{children}</div>; }

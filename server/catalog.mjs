@@ -1,16 +1,88 @@
 ﻿import { pool } from './db.mjs';
 import { AppError, ensure } from './domain.mjs';
 const API = 'https://collectionapi.metmuseum.org/public/collection';
+const PAGE_SIZE = 24;
+let allObjects;
+let allObjectsLoading;
+const exhibitionPages = new Map();
+const exhibitionLoading = new Map();
 export function normalize(item) {
   return { id: item.objectID, title: item.title, artist: item.artistDisplayName || 'Artista não identificado',
     date: item.objectDate, medium: item.medium, dimensions: item.dimensions,
     externalImage: item.primaryImageSmall || item.primaryImage, source: item.objectURL,
     publicDomain: item.isPublicDomain, imageUrl: `/api/catalog/${item.objectID}/image`, provider: 'The Metropolitan Museum of Art' };
 }
-async function api(path) {
-  const response = await fetch(`${API}${path}`, { signal: AbortSignal.timeout(6000) });
+async function api(path, timeout = 6000) {
+  const response = await fetch(`${API}${path}`, { signal: AbortSignal.timeout(timeout) });
   if (!response.ok) throw new Error(`The Met: ${response.status}`);
   return response.json();
+}
+
+// The complete ID list allows browsing beyond the search API's 10,000-result limit.
+// Only IDs and a few recently viewed pages are kept in memory; images stay at the museum.
+async function objectIds() {
+  if (allObjects && allObjects.expires > Date.now()) return allObjects.ids;
+  if (!allObjectsLoading) {
+    allObjectsLoading = api('/v1/objects', 20000).then(async result => {
+      ensure(Array.isArray(result.objectIDs), 'Catálogo externo inválido.', 503);
+      const highlights = await api('/v1.1/search?hasImages=true&isHighlight=true&limit=100&offset=0').catch(() => ({ objectIDs: [] }));
+      const priority = new Set(highlights.objectIDs || []);
+      const ids = [...priority, ...result.objectIDs.filter(id => !priority.has(id))];
+      allObjects = { ids, expires: Date.now() + 6 * 3600_000 };
+      return allObjects.ids;
+    }).finally(() => { allObjectsLoading = null; });
+  }
+  return allObjectsLoading;
+}
+export async function browseCatalog(query = '', page = 1) {
+  const q = query.trim().slice(0, 100), key = JSON.stringify([q, page]);
+  const cached = exhibitionPages.get(key);
+  if (cached && cached.expires > Date.now()) return cached.result;
+  if (exhibitionLoading.has(key)) return exhibitionLoading.get(key);
+  const request = (async () => {
+    try {
+      const offset = (page - 1) * PAGE_SIZE;
+      let ids, total, reachable;
+      if (q) {
+        ensure(offset < 10000, 'Refine a busca para acessar mais resultados.', 400);
+        const result = await api(`/v1.1/search?${new URLSearchParams({ q, hasImages: 'true', offset: String(offset), limit: String(Math.min(PAGE_SIZE, 10000 - offset)) })}`);
+        ids = result.objectIDs || []; total = result.total || 0; reachable = Math.min(total, 10000);
+      } else {
+        const all = await objectIds();
+        total = all.length; reachable = total; ids = all.slice(offset, offset + PAGE_SIZE);
+      }
+      let unavailable = 0;
+      const items = [];
+      // Limit concurrent detail requests instead of sending 24 at once.
+      for (let start = 0; start < ids.length; start += 6) {
+        const batch = await Promise.all(ids.slice(start, start + 6).map(async id => {
+          try {
+            const data = await api(`/v1/objects/${id}`);
+            if (!data.isPublicDomain || !(data.primaryImageSmall || data.primaryImage)) return null;
+            const item = normalize(data), url = new URL(item.externalImage);
+            if (url.protocol !== 'https:' || url.hostname !== 'images.metmuseum.org') return null;
+            return { ...item, imageUrl: item.externalImage };
+          } catch { unavailable++; return null; }
+        }));
+        items.push(...batch.filter(Boolean));
+      }
+      if (ids.length && unavailable === ids.length) throw new Error('Detalhes indisponíveis');
+      const result = { items, total, reachable, page, pageSize: PAGE_SIZE,
+        hasNext: offset + ids.length < reachable, offline: false, partial: unavailable > 0,
+        searchLimited: reachable < total, source: 'metropolitan' };
+      exhibitionPages.set(key, { result, expires: Date.now() + 300_000 });
+      if (exhibitionPages.size > 40) exhibitionPages.delete(exhibitionPages.keys().next().value);
+      return result;
+    } catch (error) {
+      if (error instanceof AppError && error.status === 400) throw error;
+      const pattern = `%${q}%`, offset = (page - 1) * PAGE_SIZE;
+      const { rows } = await pool.query("SELECT snapshot FROM catalog WHERE snapshot->>'title' ILIKE $1 OR snapshot->>'artist' ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3", [pattern, PAGE_SIZE + 1, offset]);
+      return { items: rows.slice(0, PAGE_SIZE).map(r => r.snapshot), total: null, reachable: null,
+        page, pageSize: PAGE_SIZE, hasNext: rows.length > PAGE_SIZE, offline: true, source: 'cache' };
+    }
+  })().finally(() => exhibitionLoading.delete(key));
+  exhibitionLoading.set(key, request);
+  return request;
 }
 export async function saveItem(item, client = pool) {
   await client.query('INSERT INTO catalog(id,snapshot) VALUES($1,$2) ON CONFLICT(id) DO NOTHING', [item.id, item]);

@@ -111,7 +111,7 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 ## Funcionalidades
 
 - Cadastro e login com perfis de leiloeiro e licitante.
-- Tema claro, escuro ou do sistema, com preferência salva no navegador e sincronizada entre abas.
+- Botão de sol/lua para alternar entre tema claro e escuro, com preferência salva no navegador e sincronizada entre abas. Na primeira visita, acompanha o sistema.
 - Vitrine separada em lotes ao vivo, agendados e encerrados.
 - Acervo público na página inicial, com busca e paginação das obras do Metropolitan, sem necessidade de login.
 - Busca de obras na API pública do The Metropolitan Museum of Art.
@@ -127,7 +127,7 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 
 **Estrutura:** `server/app.mjs` contém as rotas; `server/service.mjs`, as operações do leilão; `server/domain.mjs`, validações e assinaturas; `server/catalog.mjs`, a API externa. O frontend usa componentes React e navegação por hash, sem biblioteca de rotas ou estado global adicional. Estilos são CSS comum.
 
-**Temas:** `client/theme/tokens.css` centraliza as cores semânticas. `theme-store.js` encapsula persistência, eventos do sistema e sincronização entre abas; `ThemeProvider` integra esse estado ao React com `useSyncExternalStore`, e `ThemeSwitcher` oferece um seletor nativo acessível. O padrão segue o sistema; uma escolha explícita prevalece e funciona mesmo se o armazenamento estiver bloqueado. `public/theme-init.js` aplica a preferência antes da primeira renderização, sem script inline nem alteração da CSP. A impressão usa cores claras e as imagens das obras mantêm suas cores originais. Não foram adicionadas dependências.
+**Temas:** `client/theme/tokens.css` centraliza as cores semânticas. `theme-store.js` encapsula persistência, eventos do sistema e sincronização entre abas; `ThemeProvider` integra esse estado ao React com `useSyncExternalStore`, e `ThemeSwitcher` oferece um botão acessível com ícone de sol/lua indicando o tema que será ativado. O padrão segue o sistema; uma escolha explícita prevalece e funciona mesmo se o armazenamento estiver bloqueado. `public/theme-init.js` aplica a preferência antes da primeira renderização, sem script inline nem alteração da CSP. A impressão usa cores claras e as imagens das obras mantêm suas cores originais. Não foram adicionadas dependências.
 
 **Dinheiro e concorrência:** todos os valores são centavos inteiros. Operações financeiras usam uma transação PostgreSQL e um único advisory lock transacional. Isso ordena lances e depósitos, inclusive em lotes diferentes, e impede duas reservas simultâneas sobre o mesmo saldo. É uma escolha simples para o volume de um desafio; não foi projetada para alto tráfego. Leia a documentação de [advisory locks do PostgreSQL](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS).
 

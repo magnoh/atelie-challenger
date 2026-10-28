@@ -1,17 +1,20 @@
 .theme-switcher {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 50%;
+  background: var(--surface);
   margin: 0;
   color: var(--text);
   flex-shrink: 0;
+  cursor: pointer;
 }
 
-.theme-switcher select {
-  width: auto;
-  min-height: 44px;
-  padding: 8px;
-  cursor: pointer;
+.theme-switcher:hover {
+  background: var(--soft);
 }
 
 @media (max-width: 480px) {

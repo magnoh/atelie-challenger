@@ -11,6 +11,7 @@
     "db:seed": "node --env-file-if-exists=.env server/seed.mjs",
     "test": "node tests/domain.test.mjs",
     "test:catalog": "node --env-file-if-exists=.env tests/catalog.test.mjs",
+    "test:theme": "node tests/theme.test.mjs",
     "test:integration": "node --env-file-if-exists=.env tests/integration.test.mjs"
   },
   "dependencies": {"express": "5.2.1", "pg": "8.22.0", "react": "19.2.4", "react-dom": "19.2.4", "zod": "4.3.6"},

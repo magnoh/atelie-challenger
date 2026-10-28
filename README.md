@@ -111,6 +111,7 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 ## Funcionalidades
 
 - Cadastro e login com perfis de leiloeiro e licitante.
+- Tema claro, escuro ou do sistema, com preferência salva no navegador e sincronizada entre abas.
 - Vitrine separada em lotes ao vivo, agendados e encerrados.
 - Acervo público na página inicial, com busca e paginação das obras do Metropolitan, sem necessidade de login.
 - Busca de obras na API pública do The Metropolitan Museum of Art.
@@ -126,6 +127,8 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 
 **Estrutura:** `server/app.mjs` contém as rotas; `server/service.mjs`, as operações do leilão; `server/domain.mjs`, validações e assinaturas; `server/catalog.mjs`, a API externa. O frontend usa componentes React e navegação por hash, sem biblioteca de rotas ou estado global adicional. Estilos são CSS comum.
 
+**Temas:** `client/theme/tokens.css` centraliza as cores semânticas. `theme-store.js` encapsula persistência, eventos do sistema e sincronização entre abas; `ThemeProvider` integra esse estado ao React com `useSyncExternalStore`, e `ThemeSwitcher` oferece um seletor nativo acessível. O padrão segue o sistema; uma escolha explícita prevalece e funciona mesmo se o armazenamento estiver bloqueado. `public/theme-init.js` aplica a preferência antes da primeira renderização, sem script inline nem alteração da CSP. A impressão usa cores claras e as imagens das obras mantêm suas cores originais. Não foram adicionadas dependências.
+
 **Dinheiro e concorrência:** todos os valores são centavos inteiros. Operações financeiras usam uma transação PostgreSQL e um único advisory lock transacional. Isso ordena lances e depósitos, inclusive em lotes diferentes, e impede duas reservas simultâneas sobre o mesmo saldo. É uma escolha simples para o volume de um desafio; não foi projetada para alto tráfego. Leia a documentação de [advisory locks do PostgreSQL](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS).
 
 **Reserva:** o saldo comprometido é a soma dos lances em que o usuário lidera lotes ainda não liquidados. Ao ser superado, o lote deixa de compor essa soma imediatamente. O líder não pode dar outro lance. O primeiro lance é pelo menos o inicial; os seguintes precisam alcançar o atual mais o incremento.
@@ -140,13 +143,14 @@ Essa proteção pressupõe que o atacante tenha acesso ao banco, mas não à cha
 
 **Privacidade e autenticação:** páginas públicas mostram apelidos, nunca e-mail, nome ou ID interno do licitante. Senhas usam scrypt com salt aleatório; sessões usam tokens aleatórios armazenados como hash no banco e cookies HttpOnly/SameSite. Há validação dos dados e da origem nas mutações. Os depósitos são somente simulados.
 
-**Escopo:** uma instância Node com PostgreSQL é suficiente. Há Docker Compose para iniciar esses dois serviços. Não há microsserviços, ORM, Redis, pagamentos reais, dark mode ou infraestrutura de filas. SSE usa eventos em memória; em múltiplas instâncias, a consulta periódica ainda atualiza as telas, mas o evento imediato só alcança clientes da instância que recebeu a ação. Requisições financeiras não são repetidas automaticamente; um novo depósito confirmado é uma nova operação. Rate limit de login é local à instância.
+**Escopo:** uma instância Node com PostgreSQL é suficiente. Há Docker Compose para iniciar esses dois serviços. Não há microsserviços, ORM, Redis, pagamentos reais ou infraestrutura de filas. SSE usa eventos em memória; em múltiplas instâncias, a consulta periódica ainda atualiza as telas, mas o evento imediato só alcança clientes da instância que recebeu a ação. Requisições financeiras não são repetidas automaticamente; um novo depósito confirmado é uma nova operação. Rate limit de login é local à instância.
 
 ## Testes
 
 ```sh
 npm test
 npm run test:catalog
+npm run test:theme
 npm run test:integration
 ```
 

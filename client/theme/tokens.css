@@ -1,0 +1,174 @@
+/* Semantic colors are the single source of truth for every screen. */
+:root {
+  color-scheme: light;
+  --page: #f7f7f2;
+  --text: #262d28;
+  --text-secondary: #43543d;
+  --surface: #ffffff;
+  --surface-alt: #f0f1e9;
+  --soft: #eff1e8;
+  --muted: #626b62;
+  --line: #d4d9ce;
+  --accent: #294b3b;
+  --accent-hover: #1c392b;
+  --on-accent: #ffffff;
+  --focus: #718f59;
+  --emphasis: #52724b;
+  --eyebrow: #526348;
+  --art-background: #e5e4db;
+  --art-wall: #e4e3d9;
+  --frame: #f6f2df;
+  --overlay: #ffffffdd;
+  --shadow: #00000022;
+  --shadow-soft: #00000011;
+  --warning: #8b6b21;
+  --status-online: #427748;
+  --badge-bg: #f0eee5;
+  --badge-text: #62604f;
+  --success-bg: #eef5e7;
+  --success-text: #355a36;
+  --success-border: #c9dac0;
+  --info-bg: #eff0f7;
+  --info-text: #56587b;
+  --danger-bg: #fcf0ea;
+  --danger-text: #9a4632;
+  --danger-border: #edcfc2;
+  --control-border: #7c8872;
+  --control-disabled: #f2f3ed;
+  --placeholder: #70776b;
+  --selection-bg: #f0f4e9;
+  --selection-hover: #e6eddf;
+  --decoration: #64765c;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #141c18;
+  --text: #e7ede5;
+  --text-secondary: #c4d1bd;
+  --surface: #1d2821;
+  --surface-alt: #18221c;
+  --soft: #26332a;
+  --muted: #b0bcad;
+  --line: #455647;
+  --accent: #a1cfa5;
+  --accent-hover: #b9dfbb;
+  --on-accent: #15291d;
+  --focus: #bddba0;
+  --emphasis: #b2d1a0;
+  --eyebrow: #bbcfad;
+  --art-background: #273129;
+  --art-wall: #2c362d;
+  --frame: #4b5848;
+  --overlay: #1d2821ee;
+  --shadow: #00000066;
+  --shadow-soft: #00000044;
+  --warning: #dcc17c;
+  --status-online: #b2d79f;
+  --badge-bg: #37372a;
+  --badge-text: #e3d9b6;
+  --success-bg: #253e2b;
+  --success-text: #bbdeb0;
+  --success-border: #527450;
+  --info-bg: #2c3048;
+  --info-text: #c6ccfa;
+  --danger-bg: #402b26;
+  --danger-text: #f2b59f;
+  --danger-border: #855b4c;
+  --control-border: #778974;
+  --control-disabled: #263129;
+  --placeholder: #a2ae9b;
+  --selection-bg: #2a3d2e;
+  --selection-hover: #354d38;
+  --decoration: #b3c9a4;
+}
+
+/* Also follows the system if JavaScript is disabled. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #141c18;
+    --text: #e7ede5;
+    --text-secondary: #c4d1bd;
+    --surface: #1d2821;
+    --surface-alt: #18221c;
+    --soft: #26332a;
+    --muted: #b0bcad;
+    --line: #455647;
+    --accent: #a1cfa5;
+    --accent-hover: #b9dfbb;
+    --on-accent: #15291d;
+    --focus: #bddba0;
+    --emphasis: #b2d1a0;
+    --eyebrow: #bbcfad;
+    --art-background: #273129;
+    --art-wall: #2c362d;
+    --frame: #4b5848;
+    --overlay: #1d2821ee;
+    --shadow: #00000066;
+    --shadow-soft: #00000044;
+    --warning: #dcc17c;
+    --status-online: #b2d79f;
+    --badge-bg: #37372a;
+    --badge-text: #e3d9b6;
+    --success-bg: #253e2b;
+    --success-text: #bbdeb0;
+    --success-border: #527450;
+    --info-bg: #2c3048;
+    --info-text: #c6ccfa;
+    --danger-bg: #402b26;
+    --danger-text: #f2b59f;
+    --danger-border: #855b4c;
+    --control-border: #778974;
+    --control-disabled: #263129;
+    --placeholder: #a2ae9b;
+    --selection-bg: #2a3d2e;
+    --selection-hover: #354d38;
+    --decoration: #b3c9a4;
+  }
+}
+
+/* Printed receipts remain readable regardless of the selected screen theme. */
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --page: #ffffff;
+    --text: #262d28;
+    --text-secondary: #43543d;
+    --surface: #ffffff;
+    --surface-alt: #f0f1e9;
+    --soft: #eff1e8;
+    --muted: #626b62;
+    --line: #d4d9ce;
+    --accent: #294b3b;
+    --accent-hover: #1c392b;
+    --on-accent: #ffffff;
+    --focus: #718f59;
+    --emphasis: #52724b;
+    --eyebrow: #526348;
+    --art-background: #e5e4db;
+    --art-wall: #e4e3d9;
+    --frame: #f6f2df;
+    --overlay: #ffffffdd;
+    --shadow: #00000022;
+    --shadow-soft: #00000011;
+    --warning: #8b6b21;
+    --status-online: #427748;
+    --badge-bg: #f0eee5;
+    --badge-text: #62604f;
+    --success-bg: #eef5e7;
+    --success-text: #355a36;
+    --success-border: #c9dac0;
+    --info-bg: #eff0f7;
+    --info-text: #56587b;
+    --danger-bg: #fcf0ea;
+    --danger-text: #9a4632;
+    --danger-border: #edcfc2;
+    --control-border: #7c8872;
+    --control-disabled: #f2f3ed;
+    --placeholder: #70776b;
+    --selection-bg: #f0f4e9;
+    --selection-hover: #e6eddf;
+    --decoration: #64765c;
+  }
+}

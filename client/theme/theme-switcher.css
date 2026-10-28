@@ -1,0 +1,26 @@
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.theme-switcher select {
+  width: auto;
+  min-height: 44px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .header .account {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .theme-switcher {
+    margin-right: auto;
+  }
+}

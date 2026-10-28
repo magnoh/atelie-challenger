@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, post, money, date, go, labels } from './api';
+import { ThemeProvider } from './theme/ThemeProvider';
+import { ThemeSwitcher } from './theme/ThemeSwitcher';
+import './theme/tokens.css';
 import './style.css';
 const Context = createContext();
 const useApp = () => useContext(Context);
@@ -49,7 +52,7 @@ function App() {
   return <Context.Provider value={value}>
     <header className="header"><div className="header-inner"><a className="brand" href="#/" aria-label="Ateliê início"><span className="brand-icon">a.</span>ateliê<span className="brand-sub">CASA DE LEILÕES</span></a>
       <nav aria-label="Menu principal"><a href="#/" className={!parts.length ? 'active' : ''}>Explorar lotes</a>{user?.role === 'bidder' && <a href="#/mine">Meus arremates</a>}{user?.role === 'auctioneer' && <a href="#/seller">Painel do leiloeiro</a>}</nav>
-      <div className="account">{user ? <><a href="#/wallet" className="wallet-link">{money(wallet?.available)} <span>disponível</span></a><button className="avatar" title={`${user.name} — sair`} aria-label={`Sair da conta de ${user.name}`} onClick={async () => { await post('/auth/logout'); await refresh(); go('/'); }}>{user.name[0].toUpperCase()} ↗</button></> : <a className="button small" href="#/login">Entrar <span>↗</span></a>}</div>
+      <div className="account"><ThemeSwitcher />{user ? <><a href="#/wallet" className="wallet-link">{money(wallet?.available)} <span>disponível</span></a><button className="avatar" title={`${user.name} — sair`} aria-label={`Sair da conta de ${user.name}`} onClick={async () => { await post('/auth/logout'); await refresh(); go('/'); }}>{user.name[0].toUpperCase()} ↗</button></> : <a className="button small" href="#/login">Entrar <span>↗</span></a>}</div>
     </div></header>
     <main>{notice && <div className="toast" role="status"><span>{notice}</span><button aria-label="Fechar mensagem" onClick={() => setNotice('')}>×</button></div>}
       {error ? <div className="container"><div className="alert error" role="alert">{error} <button onClick={refresh}>Tentar novamente</button></div></div> : null}
@@ -219,5 +222,5 @@ function Receipt({ id }) {
   const share = async () => { try { await navigator.clipboard.writeText(location.href); notify('Link público copiado.'); } catch { notify('Copie o endereço desta página para compartilhar.'); } };
   return <div className="container receipt-container"><div className="receipt-actions"><a className="back" href="#/mine">← Meus arremates</a><button className="button secondary" onClick={share}>Copiar link público ↗</button></div><article className="receipt"><div className="receipt-heading"><span className="brand">ateliê.</span><span className={`badge ${data.valid ? 'live' : 'cancelled'}`}>{data.valid ? '✓ Assinatura válida' : 'Assinatura inválida'}</span></div><p className="eyebrow">COMPROVANTE DE ARREMATE</p><h1>Uma nova história<br/>para sua coleção.</h1><Image item={data.item}/><h2>{data.title}</h2><p className="muted">{data.item.artist}</p><dl><div><dt>Arrematante</dt><dd>{data.winner}</dd></div><div><dt>Valor do arremate</dt><dd><strong>{money(data.amount)}</strong></dd></div><div><dt>Emitido em</dt><dd>{date(data.issuedAt)}</dd></div><div><dt>Lances registrados</dt><dd>{data.bidCount}</dd></div><div><dt>Identificador</dt><dd className="hash">{data.id}</dd></div></dl><a className="audit-link" href={`#/audit/${data.lotId}`}>Consultar o histórico completo <span>↗</span></a><p className="fine muted">Comprovante demonstrativo. Não representa a venda ou transferência de uma obra real. Esta página é pública e não contém dados pessoais do arrematante.</p></article></div>;
 }
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(<ThemeProvider><App/></ThemeProvider>);
 

@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.env
+.env.*
+.local
+tmp
+tests
+docs
+coverage
+*.log
+*.pdf
+README.md

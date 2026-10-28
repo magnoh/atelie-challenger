@@ -1,0 +1,18 @@
+{
+  "name": "atelie-auctions", "version": "1.0.0", "private": true, "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "node --env-file-if-exists=.env --watch server/index.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "db:migrate": "node --env-file-if-exists=.env server/migrate.mjs",
+    "db:seed": "node --env-file-if-exists=.env server/seed.mjs",
+    "test": "node tests/domain.test.mjs",
+    "test:catalog": "node --env-file-if-exists=.env tests/catalog.test.mjs",
+    "test:integration": "node --env-file-if-exists=.env tests/integration.test.mjs"
+  },
+  "dependencies": {"express": "5.2.1", "pg": "8.22.0", "react": "19.2.4", "react-dom": "19.2.4", "zod": "4.3.6"},
+  "devDependencies": {"vite": "7.3.1"}
+}

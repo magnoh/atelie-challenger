@@ -1,0 +1,26 @@
+# Uma aplicação Node serve o React e a API na mesma origem.
+services:
+  - type: web
+    name: atelie-leiloes
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run db:migrate && npm run db:seed && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.3
+      - key: NODE_ENV
+        value: production
+      - key: AUDIT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: atelie-db
+          property: connectionString
+databases:
+  - name: atelie-db
+    plan: free
+    databaseName: auction
+    user: auction
+    ipAllowList: []

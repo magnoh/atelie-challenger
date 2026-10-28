@@ -1,0 +1,33 @@
+# Use junto com compose.yaml, conforme deploy/ec2/README.md.
+services:
+  db:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env.ec2}
+
+  app:
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://auction:${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env.ec2}@db:5432/auction
+      APP_ORIGIN: ${APP_ORIGIN:?Defina APP_ORIGIN no arquivo .env.ec2}
+      NODE_ENV: ${APP_ENV:-development}
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./deploy/ec2/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

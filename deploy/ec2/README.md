@@ -1,6 +1,6 @@
 # Publicar na EC2 do zero
 
-Uma EC2 com Docker: aplicação e PostgreSQL do projeto, mais Caddy para receber HTTP/HTTPS. Sem RDS, balanceador ou Kubernetes. **Os arquivos foram preparados, mas nenhuma instância AWS foi criada e este deploy ainda não foi executado.**
+Uma EC2 com Docker: aplicação e PostgreSQL do projeto, mais Caddy para receber HTTP/HTTPS. Sem RDS, balanceador ou Kubernetes. **Deploy realizado em http://15.228.247.112, com build Docker e verificações de saúde concluídos.** Este guia também permite reproduzir a instalação em outra instância.
 
 ## 1. Criar a instância no console AWS
 
@@ -52,11 +52,11 @@ Se o repositório já estiver publicado no GitHub, na EC2:
 ```sh
 sudo apt-get update
 sudo apt-get install -y git
-git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git challenger-leilao
+git clone https://github.com/magnoh/atelie-challenger.git challenger-leilao
 cd challenger-leilao
 ```
 
-Substitua a URL pelo repositório real. Não existe um repositório público criado automaticamente por estes arquivos.
+O repositório acima é público. Para usar um fork, substitua a URL.
 
 Se ainda não houver GitHub, envie os fontes pelo Ubuntu/WSL do seu computador:
 
@@ -126,6 +126,8 @@ APP_ENV=development
 
 `development` aqui permite o cookie de sessão via HTTP; o processo executa a aplicação já compilada, sem Vite ou watcher. Use somente dados simulados nessa demonstração HTTP. Para usar HTTPS com domínio, veja o passo 7.
 
+O Compose da EC2 define `TRUST_PROXY=1` independentemente do HTTP/HTTPS, pois há um único Caddy na frente da aplicação. Isso separa os limites de acesso por IP de visitante. Mantenha a porta 3001 inacessível externamente. Para executar sem proxy, mantenha `TRUST_PROXY=0`.
+
 Suba os containers:
 
 ```sh
@@ -151,7 +153,7 @@ Deve retornar `{"ok":true}`. Teste no navegador:
 - Em outro perfil de navegador, entrar como `bruno@demo.com` e dar um lance.
 - Abrir o comprovante e a auditoria sem login.
 
-Se houver erro, veja os logs de `app`, `db` e `proxy`. O primeiro build Docker ainda precisa ser validado nesse servidor; a sessão de desenvolvimento não teve acesso ao Docker/WSL para executá-lo.
+Se houver erro, veja os logs de `app`, `db` e `proxy`. O build Docker e a inicialização já foram validados na EC2 publicada; repita estas verificações em uma nova instalação.
 
 ## 7. HTTPS quando houver domínio
 

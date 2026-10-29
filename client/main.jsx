@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { api, post, money, date, go, labels } from './api';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { ThemeSwitcher } from './theme/ThemeSwitcher';
+import { copyText } from './clipboard';
 import './theme/tokens.css';
 import './style.css';
 const Context = createContext();
@@ -40,9 +41,9 @@ function App() {
   const value = { user, lots, wallet, refresh, revision, connected, offset, notify: setNotice };
   const parts = route.split('/').filter(Boolean);
   let page;
-  if (parts[0] === 'lot') page = <Room id={parts[1]} />;
-  else if (parts[0] === 'audit') page = <Audit id={parts[1]} />;
-  else if (parts[0] === 'receipt') page = <Receipt id={parts[1]} />;
+  if (parts[0] === 'lot') page = <Room key={parts[1]} id={parts[1]} />;
+  else if (parts[0] === 'audit') page = <Audit key={parts[1]} id={parts[1]} />;
+  else if (parts[0] === 'receipt') page = <Receipt key={parts[1]} id={parts[1]} />;
   else if (parts[0] === 'login') page = <Login />;
   else if (['wallet', 'mine', 'seller'].includes(parts[0]) && !user) page = <Login />;
   else if (parts[0] === 'wallet') page = <Wallet />;
@@ -128,9 +129,15 @@ function Empty({ title, text }) { return <div className="empty"><span aria-hidde
 function PageTitle({ eyebrow, title, children }) { return <div className="page-title"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{children}</div>; }
 function useResource(path) {
   const { revision } = useApp();
-  const [data, setData] = useState(null), [error, setError] = useState('');
-  useEffect(() => { let active = true; api(path).then(result => { if (active) { setData(result); setError(''); } }).catch(e => { if (active) setError(e.message); }); return () => { active = false; }; }, [path, revision]);
-  return [data, error];
+  const [resource, setResource] = useState({ path: null, data: null, error: '' });
+  useEffect(() => {
+    const controller = new AbortController();
+    api(path, { signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) setResource({ path, data, error: '' }); })
+      .catch(error => { if (!controller.signal.aborted) setResource({ path, data: null, error: error.message }); });
+    return () => controller.abort();
+  }, [path, revision]);
+  return resource.path === path ? [resource.data, resource.error] : [null, ''];
 }
 function ResourceState({ error }) { return <div className="container"><div className={error ? 'alert error' : 'loading'} role={error ? 'alert' : 'status'}>{error || 'Carregando…'}</div></div>; }
 function Room({ id }) {
@@ -218,9 +225,14 @@ function Audit({ id }) {
 function Receipt({ id }) {
   const [data, error] = useResource(`/receipts/${id}`);
   const { notify } = useApp();
+  const [manualLink, setManualLink] = useState('');
   if (!data || error) return <ResourceState error={error}/>;
-  const share = async () => { try { await navigator.clipboard.writeText(location.href); notify('Link público copiado.'); } catch { notify('Copie o endereço desta página para compartilhar.'); } };
-  return <div className="container receipt-container"><div className="receipt-actions"><a className="back" href="#/mine">← Meus arremates</a><button className="button secondary" onClick={share}>Copiar link público ↗</button></div><article className="receipt"><div className="receipt-heading"><span className="brand">ateliê.</span><span className={`badge ${data.valid ? 'live' : 'cancelled'}`}>{data.valid ? '✓ Assinatura válida' : 'Assinatura inválida'}</span></div><p className="eyebrow">COMPROVANTE DE ARREMATE</p><h1>Uma nova história<br/>para sua coleção.</h1><Image item={data.item}/><h2>{data.title}</h2><p className="muted">{data.item.artist}</p><dl><div><dt>Arrematante</dt><dd>{data.winner}</dd></div><div><dt>Valor do arremate</dt><dd><strong>{money(data.amount)}</strong></dd></div><div><dt>Emitido em</dt><dd>{date(data.issuedAt)}</dd></div><div><dt>Lances registrados</dt><dd>{data.bidCount}</dd></div><div><dt>Identificador</dt><dd className="hash">{data.id}</dd></div></dl><a className="audit-link" href={`#/audit/${data.lotId}`}>Consultar o histórico completo <span>↗</span></a><p className="fine muted">Comprovante demonstrativo. Não representa a venda ou transferência de uma obra real. Esta página é pública e não contém dados pessoais do arrematante.</p></article></div>;
+  const share = async () => {
+    const link = location.href;
+    if (await copyText(link)) { setManualLink(''); notify('Link público copiado.'); }
+    else { setManualLink(link); notify('Selecione e copie o link exibido abaixo.'); }
+  };
+  return <div className="container receipt-container"><div className="receipt-actions"><a className="back" href="#/mine">← Meus arremates</a><button className="button secondary" onClick={share}>Copiar link público ↗</button></div>{manualLink && <div className="form-panel"><label htmlFor="receipt-share-link">Link público do comprovante</label><input id="receipt-share-link" value={manualLink} readOnly onFocus={event => event.target.select()}/><p className="fine muted">Selecione o link e use Ctrl+C ou a opção Copiar do celular.</p></div>}<article className="receipt"><div className="receipt-heading"><span className="brand">ateliê.</span><span className={`badge ${data.valid ? 'live' : 'cancelled'}`}>{data.valid ? '✓ Assinatura válida' : 'Assinatura inválida'}</span></div><p className="eyebrow">COMPROVANTE DE ARREMATE</p><h1>Uma nova história<br/>para sua coleção.</h1><Image item={data.item}/><h2>{data.title}</h2><p className="muted">{data.item.artist}</p><dl><div><dt>Arrematante</dt><dd>{data.winner}</dd></div><div><dt>Valor do arremate</dt><dd><strong>{money(data.amount)}</strong></dd></div><div><dt>Emitido em</dt><dd>{date(data.issuedAt)}</dd></div><div><dt>Lances registrados</dt><dd>{data.bidCount}</dd></div><div><dt>Identificador</dt><dd className="hash">{data.id}</dd></div></dl><a className="audit-link" href={`#/audit/${data.lotId}`}>Consultar o histórico completo <span>↗</span></a><p className="fine muted">Comprovante demonstrativo. Não representa a venda ou transferência de uma obra real. Esta página é pública e não contém dados pessoais do arrematante.</p></article></div>;
 }
 createRoot(document.getElementById('root')).render(<ThemeProvider><App/></ThemeProvider>);
 

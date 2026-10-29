@@ -26,7 +26,7 @@ function rate(req, category, max, window = 60_000) {
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  if (config.production) app.set('trust proxy', 1);
+  if (config.trustProxy) app.set('trust proxy', 1);
   app.use((req, res, next) => {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https://images.metmuseum.org; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" });

@@ -4,5 +4,6 @@ export const config = {
   origin: process.env.APP_ORIGIN || 'http://localhost:5173',
   secret: process.env.AUDIT_SECRET,
   production: process.env.NODE_ENV === 'production',
+  trustProxy: process.env.TRUST_PROXY === '1',
 };
 if (!config.secret || config.secret.length < 32) throw new Error('Configure AUDIT_SECRET com pelo menos 32 caracteres.');

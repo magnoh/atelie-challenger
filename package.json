@@ -17,6 +17,8 @@
     "test": "node tests/domain.test.mjs",
     "test:catalog": "node --env-file-if-exists=.env tests/catalog.test.mjs",
     "test:theme": "node tests/theme.test.mjs",
+    "test:proxy": "node --env-file-if-exists=.env tests/proxy.test.mjs",
+    "test:clipboard": "node tests/clipboard.test.mjs",
     "test:integration": "node --env-file-if-exists=.env tests/integration.test.mjs"
   },
   "dependencies": {

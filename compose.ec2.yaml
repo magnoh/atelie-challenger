@@ -11,6 +11,7 @@ services:
       DATABASE_URL: postgres://auction:${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env.ec2}@db:5432/auction
       APP_ORIGIN: ${APP_ORIGIN:?Defina APP_ORIGIN no arquivo .env.ec2}
       NODE_ENV: ${APP_ENV:-development}
+      TRUST_PROXY: "1"
 
   proxy:
     image: caddy:2-alpine

@@ -147,7 +147,7 @@ Os horários vindos do PostgreSQL preservam microssegundos na assinatura, manten
 
 **Privacidade e autenticação:** páginas públicas mostram apelidos, nunca e-mail, nome ou ID interno do licitante. Senhas usam scrypt com salt aleatório; sessões usam tokens aleatórios armazenados como hash no banco e cookies HttpOnly/SameSite. Há validação dos dados e da origem nas mutações. Os depósitos são somente simulados.
 
-**Escopo:** uma instância Node com PostgreSQL é suficiente. Há Docker Compose para iniciar esses dois serviços. Não há microsserviços, ORM, Redis, pagamentos reais ou infraestrutura de filas. SSE usa eventos em memória; em múltiplas instâncias, a consulta periódica ainda atualiza as telas, mas o evento imediato só alcança clientes da instância que recebeu a ação. Requisições financeiras não são repetidas automaticamente; um novo depósito confirmado é uma nova operação. Rate limit de login é local à instância.
+**Escopo:** uma instância Node com PostgreSQL é suficiente. Há Docker Compose para iniciar esses dois serviços. Não há microsserviços, ORM, Redis, pagamentos reais ou infraestrutura de filas. SSE usa eventos em memória; em múltiplas instâncias, a consulta periódica ainda atualiza as telas, mas o evento imediato só alcança clientes da instância que recebeu a ação. Requisições financeiras não são repetidas automaticamente; um novo depósito confirmado é uma nova operação. Rate limit de login é local à instância. `TRUST_PROXY=1` deve ser usado somente atrás de um único proxy confiável, com acesso externo direto à aplicação bloqueado; o Compose da EC2 já define essa opção, inclusive em HTTP. Sem proxy, use `TRUST_PROXY=0`.
 
 ## Testes
 
@@ -155,10 +155,12 @@ Os horários vindos do PostgreSQL preservam microssegundos na assinatura, manten
 npm test
 npm run test:catalog
 npm run test:theme
+npm run test:proxy
+npm run test:clipboard
 npm run test:integration
 ```
 
-São 38 testes: 9 de domínio, 13 de integração, 9 de catálogo e 7 de tema. Incluem concorrência no mesmo lote e entre lotes, reserva/liberação, liquidação única, comprovante público, autorização, posição do licitante, preparação da demonstração e adulteração direta via SQL, inclusive microssegundos e hashes malformados. Os testes de integração usam `DATABASE_URL`, criam um schema temporário isolado e o removem no final. O usuário do banco precisa de permissão para criar schemas. Não apagam os dados da demonstração.
+São 45 testes: 9 de domínio, 13 de integração, 9 de catálogo, 7 de tema, 3 de proxy e 4 de cópia de links. Incluem concorrência no mesmo lote e entre lotes, reserva/liberação, liquidação única, comprovante público, autorização, posição do licitante, preparação da demonstração e adulteração direta via SQL, inclusive microssegundos e hashes malformados. Os testes de integração usam `DATABASE_URL`, criam um schema temporário isolado e o removem no final. O usuário do banco precisa de permissão para criar schemas. Não apagam os dados da demonstração.
 
 Há também 9 testes de catálogo sem banco real, cobrindo busca, importação, fallback, domínio público e navegação do acervo. A busca usa `/public/collection/v1.1/search` com paginação; os detalhes continuam em `/public/collection/v1/objects/{id}`. O endpoint antigo `/v1/search` foi desativado e retorna HTTP 410, conforme a [migração documentada pelo Metropolitan](https://metmuseum.github.io/).
 

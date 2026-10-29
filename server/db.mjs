@@ -1,7 +1,9 @@
 import pg from 'pg';
 import { EventEmitter } from 'node:events';
 import { config } from './config.mjs';
+import { canonicalTimestamp } from './domain.mjs';
 pg.types.setTypeParser(20, value => Number(value));
+pg.types.setTypeParser(1184, canonicalTimestamp);
 export const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 12 });
 export const updates = new EventEmitter();
 // One transaction lock gives wallet operations a single global ordering, even across processes.

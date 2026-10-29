@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { pool, transaction } from './db.mjs';
 import { config } from './config.mjs';
 import { AppError, ensure, cents, digest, hashPassword, verifyPassword, equal, sign } from './domain.mjs';
-import { settleDue, wallet, mutate, createLot, placeBid, cancelLot, listLots, publicLot, auditLot } from './service.mjs';
+import { settleDue, wallet, mutate, createLot, placeBid, cancelLot, listLots, publicLot, auditLot, bidderPosition } from './service.mjs';
 import { searchCatalog, browseCatalog, getItem, cacheImage } from './catalog.mjs';
 const uuid = z.uuid();
 const amountSchema = z.object({ amount: z.number().int().positive().max(100_000_000_000) }).strict();
@@ -102,7 +102,8 @@ export function createApp() {
       const { rows: [lot] } = await client.query('SELECT l.*,u.alias AS leader_alias,r.id AS receipt_id FROM lots l LEFT JOIN users u ON u.id=l.leader_id LEFT JOIN receipts r ON r.lot_id=l.id WHERE l.id=$1', [id]);
       ensure(lot && (lot.status !== 'cancelled' || lot.seller_id === req.user?.id), 'Lote não encontrado.', 404);
       const integrity = await auditLot(client, lot);
-      return { lot: publicLot(lot, req.user), bids: integrity.bids, integrity: integrity.valid };
+      const position = integrity.valid ? await bidderPosition(client, id, req.user) : null;
+      return { lot: { ...publicLot(lot, req.user), position }, bids: integrity.bids, integrity: integrity.valid };
     }, { notify: false });
     res.json({ ...data, serverTime: new Date().toISOString() });
   });

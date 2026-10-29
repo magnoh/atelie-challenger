@@ -7,6 +7,7 @@ import { createApp } from '../server/app.mjs';
 import { config } from '../server/config.mjs';
 import { pool, transaction } from '../server/db.mjs';
 import { createLot, seal, wallet, settleDue } from '../server/service.mjs';
+import { ensureDemoLot } from '../server/demo.mjs';
 const schema = `test_${randomUUID().replaceAll('-', '')}`;
 let admin, server, base, seller, ana, bruno;
 async function request(path, method = 'GET', body, session) {
@@ -127,4 +128,69 @@ test('adulteração direta no banco é pública e bloqueia liquidação', async 
   await transaction(settleDue, { notify: false });
   assert.equal((await pool.query('SELECT status FROM lots WHERE id=$1', [l.id])).rows[0].status, 'open');
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM receipts WHERE lot_id=$1', [l.id])).rows[0].n, 0);
+});
+
+test('posição considera o maior lance de cada licitante e não revela identificadores', async () => {
+  const l = await lot();
+  assert.equal((await request(`/lots/${l.id}`, 'GET', undefined, ana)).data.lot.position, null);
+  for (const [user, amount] of [[ana, 10000], [bruno, 11000], [ana, 12000]]) {
+    assert.equal((await request(`/lots/${l.id}/bids`, 'POST', { amount }, user)).status, 201);
+  }
+  assert.equal((await request(`/lots/${l.id}`, 'GET', undefined, ana)).data.lot.position, 1);
+  assert.equal((await request(`/lots/${l.id}`, 'GET', undefined, bruno)).data.lot.position, 2);
+  const publicDetail = (await request(`/lots/${l.id}`)).data;
+  assert.equal(publicDetail.lot.position, null);
+  assert.ok(!JSON.stringify(publicDetail).includes(ana.id));
+});
+
+test('auditoria detecta alteração de um microssegundo no lance e nos prazos', async () => {
+  for (const target of ['placed_at', 'starts_at', 'ends_at']) {
+    const l = await lot();
+    assert.equal((await request(`/lots/${l.id}/bids`, 'POST', { amount: 10000 }, ana)).status, 201);
+    assert.equal((await request(`/lots/${l.id}/audit`)).data.valid, true);
+    if (target === 'placed_at') await pool.query("UPDATE bids SET placed_at=placed_at+interval '1 microsecond' WHERE lot_id=$1", [l.id]);
+    else await pool.query(`UPDATE lots SET ${target}=${target}+interval '1 microsecond' WHERE id=$1`, [l.id]);
+    const result = await request(`/lots/${l.id}/audit`);
+    assert.equal(result.status, 200);
+    assert.equal(result.data.valid, false);
+    assert.equal((await request(`/lots/${l.id}/bids`, 'POST', { amount: 11000 }, bruno)).data.code, 'AUDIT_FAILED');
+    await pool.query("UPDATE lots SET ends_at=clock_timestamp()-interval '1 second' WHERE id=$1", [l.id]);
+    await transaction(settleDue, { notify: false });
+    assert.equal((await pool.query('SELECT status FROM lots WHERE id=$1', [l.id])).rows[0].status, 'open');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM receipts WHERE lot_id=$1', [l.id])).rows[0].n, 0);
+  }
+});
+
+test('hash Unicode adulterado não derruba auditoria ou liquidação dos demais lotes', async () => {
+  const l = await lot();
+  await request(`/lots/${l.id}/bids`, 'POST', { amount: 10000 }, ana);
+  await pool.query('UPDATE bids SET hash=$2 WHERE lot_id=$1', [l.id, 'é'.repeat(64)]);
+  const result = await request(`/lots/${l.id}/audit`);
+  assert.equal(result.status, 200); assert.equal(result.data.valid, false);
+  await pool.query("UPDATE lots SET ends_at=clock_timestamp()-interval '1 second' WHERE id=$1", [l.id]);
+  const validLot = await lot(); await expire(validLot.id);
+  assert.equal((await request(`/lots/${validLot.id}`)).data.lot.phase, 'closed');
+  assert.equal((await request('/lots')).status, 200);
+});
+
+test('lance após liquidação retorna LOT_CLOSED', async () => {
+  const l = await lot(); await expire(l.id);
+  await request(`/lots/${l.id}`);
+  const result = await request(`/lots/${l.id}/bids`, 'POST', { amount: 10000 }, bruno);
+  assert.equal(result.status, 409); assert.equal(result.data.code, 'LOT_CLOSED');
+});
+
+test('preparação da demonstração cria lote apenas quando necessário e preserva dados', async () => {
+  const owner = await account('demo-seller', 'auctioneer');
+  const prepare = () => transaction(client => ensureDemoLot(client, owner.id, item), { notify: false });
+  const first = await prepare(), repeated = await prepare();
+  assert.equal(first.created, true); assert.equal(repeated.created, false);
+  assert.equal(first.id, repeated.id);
+  const balance = (await request('/wallet', 'GET', undefined, owner)).data.total;
+  await expire(first.id); await request(`/lots/${first.id}`);
+  const next = await prepare();
+  assert.equal(next.created, true); assert.notEqual(next.id, first.id);
+  assert.equal((await request(`/lots/${first.id}`)).data.lot.phase, 'closed');
+  assert.equal((await request(`/lots/${next.id}`)).data.lot.phase, 'live');
+  assert.equal((await request('/wallet', 'GET', undefined, owner)).data.total, balance);
 });

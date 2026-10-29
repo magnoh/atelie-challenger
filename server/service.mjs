@@ -106,4 +106,13 @@ export function publicLot(lot, user) {
   return { ...rest, phase: phase(lot), isLeading: !!user && leader_id === user.id,
     isOwner: !!user && seller_id === user.id, minimumBid: lot.bid_count ? lot.current_amount + lot.increment : lot.initial_amount };
 }
+export async function bidderPosition(client, lotId, user) {
+  if (user?.role !== 'bidder') return null;
+  const { rows: [entry] } = await client.query(`
+    SELECT position::int FROM (
+      SELECT bidder_id, rank() OVER (ORDER BY max(amount) DESC) AS position
+      FROM bids WHERE lot_id=$1 GROUP BY bidder_id
+    ) ranking WHERE bidder_id=$2`, [lotId, user.id]);
+  return entry?.position ?? null;
+}
 export async function settle() { return transaction(settleDue, { notify: count => count > 0 }); }

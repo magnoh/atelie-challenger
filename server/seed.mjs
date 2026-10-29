@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { pool, transaction } from './db.mjs';
 import { hashPassword } from './domain.mjs';
 import { createLot, placeBid, seal, settleDue } from './service.mjs';
+import { ensureDemoLot } from './demo.mjs';
 const items = JSON.parse(await readFile(new URL('./data/catalog.json', import.meta.url), 'utf8'));
 const password = process.env.SEED_PASSWORD || 'Verzel2026!';
 try {
@@ -30,10 +31,14 @@ try {
     }
     await settleDue(client);
     const { rows: [existing] } = await client.query('SELECT COUNT(*)::int AS count FROM lots WHERE seller_id=$1', [accounts[0].id]);
-    if (existing.count) { console.log('Dados de demonstração já existem. Nenhum saldo ou prazo foi reiniciado.'); return; }
+    if (existing.count) {
+      const demo = await ensureDemoLot(client, accounts[0].id, items[0]);
+      console.log(demo.created ? 'Novo lote de demonstração aberto por 7 dias. Histórico e saldos preservados.' : 'Demonstração já possui lote aberto. Nenhum saldo ou prazo foi reiniciado.');
+      return;
+    }
     const now = Date.now(), seller = accounts[0], ana = accounts[1];
     const sample = [
-      { item: 0, title: 'Campo de trigo com ciprestes', start: -300_000, end: 3600_000, price: 50000, bid: 55000 },
+      { item: 0, title: 'Campo de trigo com ciprestes', start: -300_000, end: 7 * 86400_000, price: 50000, bid: 55000 },
       { item: 2, title: 'A grande onda de Kanagawa', start: -300_000, end: 7200_000, price: 30000 },
       { item: 3, title: 'Veneza sob o olhar de Turner', start: -300_000, end: 5400_000, price: 40000 },
       { item: 4, title: 'Um encontro com Degas', start: 86400_000, end: 90000_000, price: 25000 },

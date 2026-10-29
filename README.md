@@ -2,7 +2,7 @@
 
 Solução do teste técnico Elite Dev / Verzel. Uma aplicação pequena de leilões de arte: React no frontend, Express no backend e PostgreSQL para persistência. O mesmo servidor entrega a API e o frontend em produção.
 
-**Situação:** implementação e testes locais concluídos. O deploy público e o repositório público ainda precisam ser publicados na conta do candidato; não há URL de produção criada neste projeto.
+**Aplicação publicada:** http://15.228.247.112 — **Repositório:** https://github.com/magnoh/atelie-challenger
 
 ## Executar com Docker (recomendado)
 
@@ -94,7 +94,7 @@ A aplicação completa fica em **http://localhost:3001**. Use `NODE_ENV=developm
 
 Cada licitante recebe R$ 10.000 de saldo simulado. O seed inclui três lotes ao vivo, um agendado e um já arrematado com comprovante. Ana já deu um lance em um dos lotes ao vivo e venceu o lote encerrado. Seus saldos refletem essas operações.
 
-O seed é idempotente: executar novamente não repõe saldo nem altera prazos. Os lotes ao vivo duram de uma a duas horas a partir da primeira execução. Depois disso, crie novos lotes pelo painel ou use um banco novo para uma nova demonstração.
+O seed não repõe saldos nem altera prazos ou históricos existentes. Na primeira execução, um dos lotes fica aberto por 7 dias; os demais permitem testar prazos curtos. Ao executar o seed novamente, se o leiloeiro de demonstração não tiver nenhum lote ao vivo, é criado um novo lote aberto por 7 dias. Isso acontece também na inicialização do Docker. Não há renovação automática durante a execução: antes de uma avaliação futura, confira a vitrine e, se necessário, publique um lote pelo painel ou execute `npm run db:seed` com o mesmo banco e a mesma chave de auditoria. Não é necessário apagar o banco.
 
 ### Roteiro rápido para avaliar
 
@@ -133,6 +133,8 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 
 **Reserva:** o saldo comprometido é a soma dos lances em que o usuário lidera lotes ainda não liquidados. Ao ser superado, o lote deixa de compor essa soma imediatamente. O líder não pode dar outro lance. O primeiro lance é pelo menos o inicial; os seguintes precisam alcançar o atual mais o incremento.
 
+**Posição na sala:** cada licitante ocupa uma única posição, ordenada pelo seu maior lance no lote. A API calcula a posição do usuário autenticado; a sala atualiza esse número junto com os lances. Quem ainda não participou não possui posição. Identificadores privados dos demais participantes não são publicados.
+
 **Tempo:** o servidor decide o horário válido. Um lance aceito nos últimos 120 segundos move o fim para 120 segundos após o aceite. O servidor verifica vencimentos a cada segundo e também antes de operações relevantes. A liquidação é transacional e só acontece uma vez. Se o servidor ficar desligado, os lotes vencidos são liquidados quando ele retornar. Lotes sem lances encerram sem vencedor e sem transferência.
 
 **API externa:** foi usada a [Collection API do Metropolitan Museum](https://metmuseum.github.io/), sem chave. Somente obras com imagem e marcadas como domínio público são importadas. Dados e imagens são persistidos no PostgreSQL; o lote guarda uma cópia dos atributos na publicação. A vitrine, a sala, a auditoria e os comprovantes não consultam a API externa. Em falhas de busca, o sistema oferece o catálogo já salvo. Se a imagem de uma obra nova não puder ser salva, a publicação solicita outra obra ou uma nova tentativa. O seed contém seis registros reais da API e suas imagens em `server/data/catalog.json` e `public/art/`, permitindo a avaliação mesmo sem rede.
@@ -140,6 +142,8 @@ As contas compartilham o cookie dentro do mesmo perfil de navegador. Use perfis 
 **Auditoria:** cada lance tem um hash SHA-256 calculado sobre ID, lote, sequência, licitante, apelido, valor, horário e hash anterior. O lote guarda a quantidade e a raiz final, assinadas com HMAC-SHA-256 usando `AUDIT_SECRET`, que fica fora do banco. A assinatura também inclui líder, valor, dados do item, vendedor, prazos e situação. A auditoria recalcula a cadeia e verifica a assinatura; detecta edição, inserção e exclusão de lances, inclusive a remoção do último ou de todo o histórico. Apenas recalcular os hashes via SQL não permite gerar uma assinatura válida. Um lote adulterado bloqueia novos lances e liquidação para não movimentar dinheiro com base em registros divergentes.
 
 Essa proteção pressupõe que o atacante tenha acesso ao banco, mas não à chave nem ao servidor. Ela não protege contra controle do servidor ou restauração conjunta de um backup completo já válido e sua assinatura antiga. Não há blockchain nem carimbo de tempo externo. A interface verifica a integridade pelo servidor; não é uma prova independente dele. Trocar `AUDIT_SECRET` invalida assinaturas antigas.
+
+Os horários vindos do PostgreSQL preservam microssegundos na assinatura, mantendo compatibilidade com os registros anteriores em milissegundos. Alterações de um microssegundo nos lances ou prazos são detectadas. Hashes malformados retornam auditoria inválida sem interromper a consulta pública ou a liquidação dos demais lotes.
 
 **Privacidade e autenticação:** páginas públicas mostram apelidos, nunca e-mail, nome ou ID interno do licitante. Senhas usam scrypt com salt aleatório; sessões usam tokens aleatórios armazenados como hash no banco e cookies HttpOnly/SameSite. Há validação dos dados e da origem nas mutações. Os depósitos são somente simulados.
 
@@ -154,7 +158,7 @@ npm run test:theme
 npm run test:integration
 ```
 
-São 6 testes de domínio e 8 de integração, incluindo concorrência no mesmo lote e entre lotes, reserva/liberação, liquidação única, comprovante público, autorização e adulteração direta via SQL. Os testes de integração usam `DATABASE_URL`, criam um schema temporário isolado e o removem no final. O usuário do banco precisa de permissão para criar schemas. Não apagam os dados da demonstração.
+São 38 testes: 9 de domínio, 13 de integração, 9 de catálogo e 7 de tema. Incluem concorrência no mesmo lote e entre lotes, reserva/liberação, liquidação única, comprovante público, autorização, posição do licitante, preparação da demonstração e adulteração direta via SQL, inclusive microssegundos e hashes malformados. Os testes de integração usam `DATABASE_URL`, criam um schema temporário isolado e o removem no final. O usuário do banco precisa de permissão para criar schemas. Não apagam os dados da demonstração.
 
 Há também 9 testes de catálogo sem banco real, cobrindo busca, importação, fallback, domínio público e navegação do acervo. A busca usa `/public/collection/v1.1/search` com paginação; os detalhes continuam em `/public/collection/v1/objects/{id}`. O endpoint antigo `/v1/search` foi desativado e retorna HTTP 410, conforme a [migração documentada pelo Metropolitan](https://metmuseum.github.io/).
 
@@ -162,14 +166,12 @@ A página inicial oferece “Acervo em exposição”, sem login, consultando `/
 
 Os lotes para lance continuam na seção “Em leilão”. Uma obra em exposição não é automaticamente um lote, não possui preço ou prazo fictício e leva ao registro original do museu para detalhes.
 
-### Verificação nesta sessão
+### Verificação em 28/10/2026
 
-- Migração e seed executados em um PostgreSQL 17 local isolado.
-- 14 testes aprovados e endpoint de saúde retornando sucesso.
-- React e CSS compilados pelo executável do esbuild para servir a prévia local.
-- `npm run build` (Vite) encontrou `spawn EPERM` porque este ambiente Windows bloqueia subprocessos iniciados pelo Node. A compilação direta foi usada para verificar os fontes. O build padrão do Vite ainda precisa ser confirmado fora dessa restrição, por exemplo no deploy.
-- Não havia navegador conectado para a conferência visual. O deploy público não foi executado.
-- Dockerfile, Compose e inicialização foram revisados estaticamente. Não foi possível executar o build Docker nesta sessão: o Docker não está disponível no PowerShell e o acesso ao WSL foi negado pelo ambiente. A primeira execução de `docker compose up --build -d` ainda precisa confirmar o build e a inicialização dos containers.
+- Testes automatizados executados com PostgreSQL 17 local e schemas isolados.
+- Build de produção com Vite validado; aplicação publicada na EC2 com Docker Compose.
+- Dependências atualizadas; `npm audit` não reporta vulnerabilidades conhecidas nesta verificação.
+- Conferência visual manual em navegador e celular ainda pendente: a ferramenta de automação não teve acesso ao Chrome. Os testes automatizados não substituem essa revisão.
 
 ## Deploy na AWS EC2
 

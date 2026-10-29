@@ -18,8 +18,9 @@ export function phase(lot, now = Date.now()) {
 }
 export function validateBid(lot, user, amount, available, now = Date.now()) {
   ensure(user.role === 'bidder', 'Somente licitantes podem dar lances.', 403, 'ROLE_FORBIDDEN');
-  ensure(lot.status === 'open' && new Date(lot.starts_at).getTime() <= now, 'O lote ainda não começou ou foi cancelado.', 409, 'NOT_LIVE');
-  ensure(new Date(lot.ends_at).getTime() > now, 'O lote está encerrado.', 409, 'LOT_CLOSED');
+  ensure(lot.status !== 'cancelled', 'O lote foi cancelado.', 409, 'LOT_CANCELLED');
+  ensure(lot.status !== 'closed' && new Date(lot.ends_at).getTime() > now, 'O lote está encerrado.', 409, 'LOT_CLOSED');
+  ensure(lot.status === 'open' && new Date(lot.starts_at).getTime() <= now, 'O lote ainda não começou.', 409, 'NOT_LIVE');
   ensure(lot.leader_id !== user.id, 'Você já está ganhando este lote.', 409, 'ALREADY_LEADING');
   cents(amount);
   const minimum = lot.bid_count ? lot.current_amount + lot.increment : lot.initial_amount;
@@ -36,14 +37,26 @@ export function canonical(value) {
 }
 export const digest = value => createHash('sha256').update(typeof value === 'string' ? value : canonical(value)).digest('hex');
 export const sign = (value, secret) => createHmac('sha256', secret).update(canonical(value)).digest('hex');
-export function equal(a, b) { return typeof a === 'string' && typeof b === 'string' && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
+export function equal(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const left = Buffer.from(a), right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+// Keep legacy millisecond signatures unchanged, while preserving PostgreSQL microseconds.
+export function canonicalTimestamp(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(+date)) return String(value);
+  const fraction = typeof value === 'string' ? value.match(/[T ]\d{2}:\d{2}:\d{2}\.(\d+)/)?.[1] : '';
+  const remainder = (fraction || '').slice(3).replace(/0+$/, '');
+  return date.toISOString().replace(/Z$/, `${remainder}Z`);
+}
 export function bidData(bid) {
   return { id: bid.id, lotId: bid.lot_id, sequence: bid.sequence, bidderId: bid.bidder_id,
-    bidder: bid.bidder_alias, amount: Number(bid.amount), placedAt: new Date(bid.placed_at).toISOString(), previousHash: bid.previous_hash };
+    bidder: bid.bidder_alias, amount: Number(bid.amount), placedAt: canonicalTimestamp(bid.placed_at), previousHash: bid.previous_hash };
 }
 export const headData = lot => ({ lotId: lot.id, count: lot.bid_count, head: lot.audit_head,
   leaderId: lot.leader_id, amount: lot.current_amount, initial: lot.initial_amount,
-  increment: lot.increment, startsAt: new Date(lot.starts_at).toISOString(), endsAt: new Date(lot.ends_at).toISOString(),
+  increment: lot.increment, startsAt: canonicalTimestamp(lot.starts_at), endsAt: canonicalTimestamp(lot.ends_at),
   status: lot.status, item: lot.snapshot, sellerId: lot.seller_id, title: lot.title });
 export function audit(lot, bids, secret) {
   let head = GENESIS;

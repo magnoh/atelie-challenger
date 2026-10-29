@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { cents, validateBid, extendedEnd, GENESIS, sign, digest, bidData, headData, audit } from '../server/domain.mjs';
+import { cents, validateBid, extendedEnd, GENESIS, sign, digest, bidData, headData, audit, equal, canonicalTimestamp } from '../server/domain.mjs';
 const now = Date.now(), secret = 'test-secret-kept-outside-the-database';
 const user = { id: 'alice', role: 'bidder' };
 const base = () => ({ id: randomUUID(), seller_id: 'seller', title: 'Arte', snapshot: { id: 1 }, status: 'open',
@@ -58,4 +58,28 @@ test('recalcular os hashes e o cabeçalho no banco não forja a assinatura exter
   lot.audit_head = previous;
   assert.equal(audit(lot, bids, secret).valid, false);
   assert.equal(audit({ ...lot, bid_count: 0, audit_head: GENESIS, leader_id: null, current_amount: null }, [], secret).valid, false);
+});
+
+test('comparação de assinaturas malformadas falha sem lançar erro', () => {
+  assert.equal(equal('a'.repeat(64), 'é'.repeat(64)), false);
+  assert.equal(equal('abc', null), false);
+  const { lot, bids } = signedHistory();
+  bids[0].hash = 'é'.repeat(64);
+  assert.equal(audit(lot, bids, secret).valid, false);
+  assert.equal(audit({ ...lot, audit_seal: 'é'.repeat(64) }, [], secret).valid, false);
+});
+
+test('horários preservam microssegundos e assinaturas antigas em milissegundos', () => {
+  assert.equal(canonicalTimestamp('2026-10-28 01:00:00.123000+00'), '2026-10-28T01:00:00.123Z');
+  assert.equal(canonicalTimestamp('2026-10-27 22:00:00.123001-03'), '2026-10-28T01:00:00.123001Z');
+  const { lot, bids } = signedHistory();
+  bids[0].placed_at = bids[0].placed_at.replace('Z', '001Z');
+  assert.equal(audit(lot, bids, secret).valid, false);
+  assert.equal(audit({ ...lot, ends_at: 'infinity' }, bids, secret).valid, false);
+});
+
+test('lotes encerrados e cancelados retornam códigos específicos', () => {
+  for (const [status, code] of [['closed', 'LOT_CLOSED'], ['cancelled', 'LOT_CANCELLED']]) {
+    assert.throws(() => validateBid({ ...base(), status }, user, 10000, 10000, now), e => e.code === code);
+  }
 });

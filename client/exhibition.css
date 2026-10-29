@@ -1,0 +1,10 @@
+.exhibition-section { scroll-margin-top: 24px; }
+.exhibition-filters { display: grid; grid-template-columns: 1fr 1.5fr 1.5fr 1fr; gap: 16px; margin-bottom: 28px; }
+.exhibition-filters label { margin-top: 0; }
+.exhibition-filter-actions { grid-column: 1 / -1; display: flex; gap: 12px; }
+.artwork-skeleton { min-height: 360px; padding-bottom: 20px; }
+.artwork-skeleton div { height: 250px; background: var(--soft); }
+.artwork-skeleton span { display: block; height: 16px; margin: 20px 20px 0; width: 65%; background: var(--soft); border-radius: 4px; }
+.artwork-skeleton span:last-child { width: 45%; }
+@media (max-width: 1000px) { .exhibition-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .exhibition-filters { grid-template-columns: 1fr; } }

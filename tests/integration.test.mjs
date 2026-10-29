@@ -56,6 +56,10 @@ test('autenticação, perfis e validação de depósitos', async () => {
   assert.equal(result.data.user.password_hash, undefined);
   assert.equal((await request('/exhibition?page=0')).status, 400);
   assert.equal((await request('/exhibition?page=abc')).status, 400);
+  assert.equal((await request('/exhibition?departmentId=999')).status, 400);
+  assert.equal((await request('/exhibition?mode=invalid')).status, 400);
+  assert.equal((await request('/exhibition?offset=-1')).status, 400);
+  assert.equal((await request('/exhibition?medium=invalid')).status, 400);
   assert.equal((await request('/catalog')).status, 401);
 });
 test('lance reserva saldo, impede autocobertura e libera o usuário superado', async () => {

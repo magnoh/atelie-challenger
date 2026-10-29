@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 COPY index.html vite.config.js ./
 COPY client ./client
+COPY shared ./shared
 COPY public ./public
 RUN npm run build
 RUN npm prune --omit=dev
@@ -15,6 +16,7 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node server ./server
+COPY --chown=node:node shared ./shared
 COPY --chown=node:node public ./public
 COPY --chown=node:node scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
 RUN mkdir -p /app/data && chown node:node /app/data

@@ -8,6 +8,7 @@ import { config } from './config.mjs';
 import { AppError, ensure, cents, digest, hashPassword, verifyPassword, equal, sign } from './domain.mjs';
 import { settleDue, wallet, mutate, createLot, placeBid, cancelLot, listLots, publicLot, auditLot, bidderPosition } from './service.mjs';
 import { searchCatalog, browseCatalog, getItem, cacheImage } from './catalog.mjs';
+import { departments, media } from '../shared/exhibition-options.js';
 const uuid = z.uuid();
 const amountSchema = z.object({ amount: z.number().int().positive().max(100_000_000_000) }).strict();
 const credentials = z.object({ email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128) });
@@ -164,8 +165,14 @@ export function createApp() {
   });
   app.get('/api/exhibition', async (req, res) => {
     rate(req, 'exhibition', 60);
-    const query = z.object({ q: z.string().trim().max(100).default(''), page: z.coerce.number().int().min(1).max(50000).default(1) }).parse(req.query);
-    res.json(await browseCatalog(query.q, query.page));
+    const query = z.object({
+      q: z.string().trim().max(100).default(''), page: z.coerce.number().int().min(1).max(200000).default(1),
+      offset: z.coerce.number().int().min(0).max(2000000).optional(),
+      mode: z.enum(['all', 'title', 'artist']).default('all'),
+      departmentId: z.string().refine(value => !value || departments.some(d => String(d.id) === value)).default(''),
+      medium: z.string().refine(value => !value || media.some(m => m.value === value)).default(''),
+    }).parse(req.query);
+    res.json(await browseCatalog(query.q, query.page, query));
   });
   app.get('/api/catalog', auth('auctioneer'), async (req, res) => { rate(req, 'catalog', 20); res.json(await searchCatalog(String(req.query.q || ''))); });
   app.get('/api/catalog/:id/image', async (req, res) => {

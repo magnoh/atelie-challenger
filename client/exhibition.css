@@ -1,4 +1,10 @@
 .exhibition-section { scroll-margin-top: 24px; }
+.exhibition-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.exhibition-toolbar .exhibition-intro { margin: 0; }
+.exhibition-filter-toggle { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; }
+.exhibition-filter-toggle:hover, .exhibition-filter-toggle[aria-expanded="true"] { background: var(--soft); color: var(--accent); }
+.filter-active-dot { position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.exhibition-filters[hidden] { display: none; }
 .exhibition-filters { display: grid; grid-template-columns: 1fr 1.5fr 1.5fr 1fr; gap: 16px; margin-bottom: 28px; }
 .exhibition-filters label { margin-top: 0; }
 .exhibition-filter-actions { grid-column: 1 / -1; display: flex; gap: 12px; }

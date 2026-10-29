@@ -9,6 +9,8 @@ const pageKey = (filters, page, offset) => new URLSearchParams({ ...filters, pag
 export function Exhibition() {
   const section = useRef(null), cache = useRef(new Map()), pending = useRef(new Map());
   const [visible, setVisible] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterButton = useRef(null);
   const [draft, setDraft] = useState(initialFilters), [filters, setFilters] = useState(initialFilters);
   const [offsets, setOffsets] = useState([0]), [page, setPage] = useState(1), [retry, setRetry] = useState(0);
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
@@ -42,6 +44,7 @@ export function Exhibition() {
   }, [visible, key, retry]);
 
   const updateDraft = event => setDraft(value => ({ ...value, [event.target.name]: event.target.value }));
+  const closeFilters = () => { setFiltersOpen(false); filterButton.current?.focus(); };
   const applyFilters = next => {
     setFilters({ ...next, q: next.q.trim() }); setPage(1); setOffsets([0]); setData(null); setLoading(true);
     cache.current.clear(); setRetry(value => value + 1); setVisible(true);
@@ -61,13 +64,16 @@ export function Exhibition() {
   };
   return <section ref={section} id="exhibition" className="catalog-section exhibition-section" aria-busy={loading}>
     <div className="section-heading"><div><p className="eyebrow">THE METROPOLITAN MUSEUM OF ART</p><h2>Acervo em exposição</h2></div><a className="text-link" href="#lots" onClick={e => { e.preventDefault(); document.getElementById('lots').scrollIntoView({ behavior: 'smooth' }); }}>Ver lotes em leilão ↓</a></div>
-    <p className="muted exhibition-intro">Descubra obras em páginas de 6. Filtre por autor, título, categoria ou tipo de obra.</p>
-    <form className="exhibition-filters" onSubmit={event => { event.preventDefault(); applyFilters(draft); }}>
+    <div className="exhibition-toolbar"><p className="muted exhibition-intro">Descubra obras em páginas de 6.</p><button ref={filterButton} type="button" className="exhibition-filter-toggle" aria-label={filtersOpen ? 'Fechar filtros' : 'Abrir filtros'} title="Filtros" aria-expanded={filtersOpen} aria-controls="exhibition-filters" onClick={() => setFiltersOpen(open => !open)}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8Z"/></svg>
+      {(filters.q || filters.departmentId || filters.medium) && <span className="filter-active-dot" aria-hidden="true"/>}
+    </button></div>
+    <form id="exhibition-filters" className="exhibition-filters" hidden={!filtersOpen} onKeyDown={event => { if (event.key === 'Escape') closeFilters(); }} onSubmit={event => { event.preventDefault(); applyFilters(draft); closeFilters(); }}>
       <div><label htmlFor="exhibition-mode">Buscar por</label><select id="exhibition-mode" name="mode" value={draft.mode} onChange={updateDraft}><option value="all">Palavra-chave</option><option value="title">Título da obra</option><option value="artist">Autor</option></select></div>
       <div className="exhibition-query"><label htmlFor="exhibition-query">{draft.mode === 'artist' ? 'Nome do autor' : 'Busca'}</label><input id="exhibition-query" name="q" value={draft.q} maxLength={100} onChange={updateDraft} placeholder={draft.mode === 'artist' ? 'Ex.: van Gogh, Monet, Hokusai' : 'Ex.: paisagem, flores, retrato'}/></div>
       <div><label htmlFor="exhibition-category">Categoria</label><select id="exhibition-category" name="departmentId" value={draft.departmentId} onChange={updateDraft}><option value="">Todas as categorias</option>{departments.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
       <div><label htmlFor="exhibition-medium">Tipo de obra</label><select id="exhibition-medium" name="medium" value={draft.medium} onChange={updateDraft}><option value="">Todos os tipos</option>{media.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
-      <div className="exhibition-filter-actions"><button className="button">Aplicar filtros</button><button type="button" className="button secondary" onClick={() => { setDraft(initialFilters); applyFilters(initialFilters); }}>Limpar</button></div>
+      <div className="exhibition-filter-actions"><button className="button">Buscar</button><button type="button" className="button secondary" onClick={() => setDraft(initialFilters)}>Limpar</button></div>
     </form>
     {error ? <div className="alert error" role="alert">{error} <button className="text-link" onClick={() => setRetry(value => value + 1)}>Tentar novamente</button></div> : loading ? <>
       <p role="status" className="fine muted">Carregando obras…</p><div className="lot-grid" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <div key={i} className="lot-card artwork-skeleton"><div/><span/><span/></div>)}</div>

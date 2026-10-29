@@ -25,26 +25,41 @@ async function api(path, timeout = 6000) {
 
 // The complete ID list allows browsing beyond the search API's 10,000-result limit.
 // Only IDs and a few recently viewed pages are kept in memory; images stay at the museum.
-async function objectIds(departmentId = '') {
+async function objectIds(departmentId = '', offset = 0) {
   const cached = objectLists.get(departmentId);
-  if (cached && cached.expires > Date.now()) return cached.ids;
+  if (cached && cached.expires > Date.now() && (cached.complete || offset + 18 < cached.ids.length)) return cached;
+  let highlightsRequest;
+  let fullRequest = objectListsLoading.get(departmentId);
   if (!objectListsLoading.has(departmentId)) {
     const suffix = departmentId ? `?departmentIds=${departmentId}` : '';
     const highlightsQuery = new URLSearchParams({ hasImages: 'true', isHighlight: 'true', limit: '100', offset: '0' });
     if (departmentId) highlightsQuery.set('departmentId', departmentId);
-    const loading = Promise.all([
-      api(`/v1/objects${suffix}`),
-      api(`/v1.1/search?${highlightsQuery}`).catch(() => ({ objectIDs: [] })),
-    ]).then(([result, highlights]) => {
+    highlightsRequest = api(`/v1.1/search?${highlightsQuery}`).catch(() => ({ objectIDs: [] }));
+    const loading = Promise.all([api(`/v1/objects${suffix}`), highlightsRequest]).then(([result, highlights]) => {
       ensure(Array.isArray(result.objectIDs), 'Catálogo externo inválido.', 503);
       const priority = new Set(highlights.objectIDs || []);
       const ids = [...priority, ...result.objectIDs.filter(id => !priority.has(id))];
-      objectLists.set(departmentId, { ids, expires: Date.now() + 6 * 3600_000 });
-      return ids;
+      const list = { ids, complete: true, expires: Date.now() + 6 * 3600_000 };
+      objectLists.set(departmentId, list);
+      return list;
     }).finally(() => objectListsLoading.delete(departmentId));
     objectListsLoading.set(departmentId, loading);
+    fullRequest = loading;
+    // The first pages can use the same highlights prefix while full enumeration finishes.
+    // Handle rejection even when the caller returns that prefix immediately.
+    loading.catch(() => {});
   }
-  return objectListsLoading.get(departmentId);
+  if (highlightsRequest) {
+    const highlights = await highlightsRequest;
+    if (highlights.objectIDs?.length > offset + 18) {
+      const current = objectLists.get(departmentId);
+      if (current?.complete && current.expires > Date.now()) return current;
+      const preview = { ids: [...new Set(highlights.objectIDs)], complete: false, expires: Date.now() + 30000 };
+      objectLists.set(departmentId, preview);
+      return preview;
+    }
+  }
+  return fullRequest;
 }
 async function exhibitionItem(id) {
   const cached = detailCache.get(id);
@@ -75,7 +90,8 @@ export async function browseCatalog(query = '', page = 1, filters = {}) {
     try {
       const searching = !!(q || medium);
       if (searching) ensure(offset < 10000, 'Refine a busca para acessar mais resultados.', 400);
-      const all = searching ? null : await objectIds(departmentId);
+      const listing = searching ? null : await objectIds(departmentId, offset);
+      const all = listing?.ids;
       let total = all?.length || 0, reachable = total, cursor = offset, unavailable = 0, inspected = 0;
       const items = [];
       // Fill six visible slots, but bound work on pages with missing/public-domain images.
@@ -109,8 +125,9 @@ export async function browseCatalog(query = '', page = 1, filters = {}) {
         if (cursor >= reachable || unavailable === inspected) break;
       }
       if (inspected && unavailable === inspected) throw new Error('Detalhes indisponíveis');
-      const result = { items, total, reachable, page, pageSize: PAGE_SIZE,
-        nextOffset: cursor, hasNext: cursor < reachable, offline: false, partial: unavailable > 0,
+      const enumerating = listing?.complete === false;
+      const result = { items, total: enumerating ? null : total, reachable: enumerating ? null : reachable, page, pageSize: PAGE_SIZE,
+        nextOffset: cursor, hasNext: enumerating || cursor < reachable, offline: false, partial: unavailable > 0,
         searchLimited: reachable < total, source: 'metropolitan' };
       if (!result.partial) exhibitionPages.set(key, { result, expires: Date.now() + 300_000 });
       if (exhibitionPages.size > 40) exhibitionPages.delete(exhibitionPages.keys().next().value);

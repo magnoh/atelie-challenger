@@ -162,3 +162,27 @@ test('categoria sem busca mantém navegação pelo acervo completo e cache separ
   }, url => url.includes('/v1/objects?') ? json({ objectIDs: [1] })
     : url.includes('/v1.1/search?') ? json({ objectIDs: [] }) : json({ ...artwork, objectID: 1 }));
 });
+
+test('primeira página não aguarda a lista completa e mantém a ordem ao completar o acervo', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await mocked(async () => {
+    let timer;
+    try {
+      const first = await Promise.race([
+        browseCatalog('', 1),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(Error('A primeira página aguardou a lista completa')), 1000); }),
+      ]);
+      assert.deepEqual(first.items.map(i => i.id), [100, 101, 102, 103, 104, 105]);
+      assert.equal(first.total, null); assert.equal(first.hasNext, true);
+      release();
+      const afterHighlights = await browseCatalog('', 5, { offset: 24 });
+      assert.deepEqual(afterHighlights.items.map(i => i.id), [1, 2, 3, 4, 5, 6]);
+      assert.equal(afterHighlights.total, 200);
+    } finally { clearTimeout(timer); release(); }
+  }, async url => {
+    if (url.endsWith('/v1/objects')) { await gate; return json({ objectIDs: Array.from({ length: 200 }, (_, i) => i + 1) }); }
+    if (url.includes('/v1.1/search?')) return json({ objectIDs: Array.from({ length: 24 }, (_, i) => i + 100) });
+    return json({ ...artwork, objectID: Number(url.split('/').at(-1)) });
+  });
+});

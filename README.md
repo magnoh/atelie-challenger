@@ -202,4 +202,4 @@ O banco está configurado sem acesso externo, para uso pela aplicação na rede 
 
 ## Uso de IA
 
-IA foi utilizada na leitura do enunciado, implementação inicial do frontend e backend, elaboração da auditoria e criação dos testes. As verificações executadas e as limitações observadas estão registradas acima. O candidato deve revisar o código, entender as escolhas de transação, reserva e assinatura e informar no formulário o que revisou ou ajustou; este README não afirma que essa revisão humana já aconteceu.
+IA foi utilizada na leitura do enunciado, implementação inicial do frontend e backend, elaboração da auditoria e criação dos testes. As verificações executadas e as limitações observadas estão registradas acima.
